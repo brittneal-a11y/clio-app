@@ -1271,7 +1271,7 @@ function clearChat() {
 // ── GEMINI API ──
 async function callGemini(prompt) {
   const key = (window._profile?.geminiKey)||GEMINI_KEY;
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`,{
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
   });
@@ -1282,7 +1282,7 @@ async function callGemini(prompt) {
 
 async function callGeminiChat(systemInstruction, messages) {
   const key = (window._profile?.geminiKey)||GEMINI_KEY;
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`,{
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       system_instruction:{parts:[{text:systemInstruction}]},
