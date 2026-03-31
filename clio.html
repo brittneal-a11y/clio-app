@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Clio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyAzFZ0Bcns3PrGx4Gcsi0dvp2t5waU0ZMU",
+    authDomain: "clio-9d3ae.firebaseapp.com",
+    projectId: "clio-9d3ae",
+    storageBucket: "clio-9d3ae.firebasestorage.app",
+    messagingSenderId: "916591689940",
+    appId: "1:916591689940:web:060df35ae3fcb3a7697b41"
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  window._fb = { auth, db, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, writeBatch };
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      window._user = user;
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (snap.exists() && snap.data().setupComplete) {
+        window._profile = snap.data();
+        showApp();
+      } else { showWizard(); }
+    } else { window._user = null; showLanding(); }
+  });
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --font-body:'DM Sans',sans-serif;--font-display:'DM Serif Display',serif;
+  --cream:#FAF8F5;--cream-dark:#F0EDE8;--stone:#E8E3DC;
+  --text-primary:#1A1814;--text-secondary:#6B6560;--text-tertiary:#A09890;
+  --accent:#C4956A;--accent-light:#F5EBE0;--accent-dark:#9E7250;
+  --green:#5C8B6E;--green-light:#EAF2ED;
+  --red:#B85C5C;--red-light:#F5EAEA;
+  --blue:#4A7BA7;--blue-light:#EAF1F8;
+  --border:#E2DDD7;--shadow-sm:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 16px rgba(0,0,0,.08);
+  --radius-sm:8px;--radius-md:14px;--radius-lg:20px;--radius-xl:28px;--tab-height:72px;
+}
+html,body{height:100%;overflow:hidden;background:var(--cream);font-family:var(--font-body);color:var(--text-primary);-webkit-font-smoothing:antialiased}
+#root{height:100%;display:flex;flex-direction:column;max-width:430px;margin:0 auto;position:relative;background:var(--cream)}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden}
+.screen.active{display:flex}
+
+/* LANDING */
+#screen-landing{align-items:center;justify-content:center;padding:40px 32px;gap:0}
+.landing-logo{font-family:var(--font-display);font-size:64px;letter-spacing:-1px;animation:fadeUp .6s ease both}
+.landing-tagline{font-size:15px;color:var(--text-secondary);text-align:center;line-height:1.6;margin-bottom:56px;animation:fadeUp .6s .1s ease both}
+.landing-art{width:180px;height:180px;margin-bottom:40px;animation:fadeUp .6s .05s ease both}
+.btn-primary{width:100%;padding:16px;background:var(--text-primary);color:var(--cream);border:none;border-radius:var(--radius-xl);font-family:var(--font-body);font-size:16px;font-weight:500;cursor:pointer;transition:transform .15s;display:flex;align-items:center;justify-content:center;gap:10px;animation:fadeUp .6s .2s ease both}
+.btn-primary:active{transform:scale(.97)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.btn-secondary{width:100%;padding:14px;background:transparent;color:var(--text-secondary);border:1.5px solid var(--border);border-radius:var(--radius-xl);font-family:var(--font-body);font-size:15px;cursor:pointer;margin-top:12px}
+
+/* WIZARD */
+#screen-wizard{overflow-y:auto;background:var(--cream)}
+.wiz-header{padding:56px 28px 20px;position:sticky;top:0;background:var(--cream);z-index:10}
+.wiz-progress{display:flex;gap:5px;margin-bottom:28px}
+.wiz-dot{height:3px;flex:1;background:var(--stone);border-radius:2px;transition:background .3s}
+.wiz-dot.active{background:var(--accent)}
+.wiz-dot.done{background:var(--text-primary)}
+.wiz-step-lbl{font-size:12px;font-weight:500;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.wiz-title{font-family:var(--font-display);font-size:28px;line-height:1.2;margin-bottom:6px;white-space:pre-line}
+.wiz-sub{font-size:14px;color:var(--text-secondary);line-height:1.5}
+.wiz-body{padding:12px 28px 140px}
+.wiz-footer{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:16px 28px 36px;background:linear-gradient(to top,var(--cream) 75%,transparent);z-index:20}
+
+/* Form */
+.field{margin-bottom:18px}
+.field-label{font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:7px;display:block}
+.field-input{width:100%;padding:13px 15px;background:white;border:1.5px solid var(--border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:15px;color:var(--text-primary);outline:none;transition:border-color .2s}
+.field-input:focus{border-color:var(--accent)}
+.field-input::placeholder{color:var(--text-tertiary)}
+select.field-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23A09890' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+textarea.field-input{resize:none;min-height:80px;line-height:1.5}
+.chip-group{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:9px 16px;background:white;border:1.5px solid var(--border);border-radius:100px;font-family:var(--font-body);font-size:13px;color:var(--text-secondary);cursor:pointer;transition:all .15s;user-select:none}
+.chip.selected{background:var(--text-primary);border-color:var(--text-primary);color:white}
+.day-chip{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:white;border:1.5px solid var(--border);font-size:12px;font-weight:500;cursor:pointer;color:var(--text-secondary);user-select:none;transition:all .15s;flex-shrink:0}
+.day-chip.selected{background:var(--text-primary);border-color:var(--text-primary);color:white}
+.days-row{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Routine builder */
+.routine-card{background:white;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:10px}
+.routine-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.routine-card-title{font-size:14px;font-weight:500}
+.routine-card-meta{font-size:12px;color:var(--text-tertiary)}
+.routine-task-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.routine-task-row:last-child{border-bottom:none;padding-bottom:0}
+.routine-task-name{flex:1;font-size:13px}
+.routine-task-time{font-size:12px;color:var(--text-tertiary)}
+.add-routine-task-btn{width:100%;padding:11px;background:var(--cream-dark);border:1.5px dashed var(--border);border-radius:var(--radius-md);font-family:var(--font-body);font-size:13px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:border-color .15s}
+.add-routine-task-btn:hover{border-color:var(--accent);color:var(--accent)}
+.info-box{background:var(--green-light);border-radius:var(--radius-md);padding:12px 14px;font-size:13px;color:var(--green);line-height:1.5;margin-bottom:16px}
+
+/* MAIN APP */
+.app-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:var(--tab-height)}
+
+/* Tab bar */
+.tab-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:var(--tab-height);background:rgba(250,248,245,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;align-items:stretch;z-index:100}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;border:none;background:none;padding-bottom:8px;color:var(--text-tertiary);font-family:var(--font-body)}
+.tab-item.active{color:var(--text-primary)}
+.tab-item span{font-size:11px;font-weight:500}
+
+/* HOME */
+.home-header{padding:52px 22px 16px}
+.home-time-lbl{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px}
+.home-greeting{font-family:var(--font-display);font-size:30px;line-height:1.2;margin-bottom:18px}
+.home-greeting em{font-style:italic;color:var(--accent)}
+
+/* Callout boxes */
+.callout-box{border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:12px}
+.callout-box.routine-box{background:var(--text-primary);color:white}
+.callout-box.tasks-box{background:white;border:1.5px solid var(--border);box-shadow:var(--shadow-sm)}
+.callout-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.callout-title{font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.callout-title.light{color:rgba(255,255,255,.6)}
+.callout-title.dark{color:var(--text-tertiary)}
+
+/* Progress ring */
+.progress-ring-wrap{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.progress-ring{transform:rotate(-90deg)}
+.progress-ring-bg{fill:none;stroke:rgba(255,255,255,.15);stroke-width:3}
+.progress-ring-fill{fill:none;stroke:white;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .5s ease}
+.progress-text{font-size:13px;color:rgba(255,255,255,.8);line-height:1.5}
+.progress-fraction{font-size:22px;font-weight:300;color:white;line-height:1}
+
+/* Routine task items in callout */
+.callout-task{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.callout-task:last-child{border-bottom:none;padding-bottom:0}
+.callout-task.dark-border{border-bottom-color:var(--border)}
+.callout-task-check{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.callout-task-check.checked{background:white;border-color:white}
+.callout-task-check.dark{border-color:var(--border)}
+.callout-task-check.dark.checked{background:var(--green);border-color:var(--green)}
+.callout-task-name{font-size:14px;flex:1}
+.callout-task-name.done{text-decoration:line-through;opacity:.5}
+.callout-task-time{font-size:11px;opacity:.5}
+
+/* Top tasks in callout */
+.top-task-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.top-task-item:last-child{border-bottom:none;padding-bottom:0}
+.priority-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.priority-dot.high{background:var(--red)}
+.priority-dot.med{background:var(--accent)}
+.priority-dot.low{background:var(--green)}
+.priority-dot.none{background:var(--stone)}
+.top-task-name{font-size:14px;font-weight:500;flex:1;line-height:1.4}
+.top-task-due{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+
+/* Unfinished routine prompt */
+.routine-prompt-card{background:var(--accent-light);border:1.5px solid #E8D5C0;border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:12px}
+.routine-prompt-title{font-size:14px;font-weight:500;color:var(--accent-dark);margin-bottom:10px;line-height:1.4}
+.prompt-btn-row{display:flex;gap:8px}
+.prompt-btn{flex:1;padding:10px 8px;border-radius:var(--radius-md);font-family:var(--font-body);font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid #E8D5C0;background:white;color:var(--text-primary);transition:all .15s}
+.prompt-btn.primary{background:var(--text-primary);color:white;border-color:var(--text-primary)}
+
+/* Weather */
+.weather-row{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--blue-light);border-radius:var(--radius-md);margin-bottom:12px}
+.weather-temp{font-size:20px;font-weight:300}
+.weather-desc{font-size:12px;color:var(--text-secondary)}
+
+/* Section header */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title{font-size:12px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em}
+.section-action{font-size:12px;color:var(--accent);cursor:pointer;border:none;background:none;font-family:var(--font-body);font-weight:500}
+
+/* TASKS TAB */
+.tasks-header{padding:52px 22px 12px;display:flex;align-items:flex-end;justify-content:space-between}
+.tasks-title{font-family:var(--font-display);font-size:32px}
+.add-btn{width:44px;height:44px;background:var(--text-primary);border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;box-shadow:var(--shadow-md);transition:transform .15s;flex-shrink:0}
+.add-btn:active{transform:scale(.93)}
+
+/* Toggle */
+.toggle-wrap{display:flex;margin:0 22px 16px;background:var(--stone);border-radius:100px;padding:3px}
+.toggle-btn{flex:1;padding:8px;border-radius:100px;border:none;font-family:var(--font-body);font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all .2s}
+.toggle-btn.active{background:white;color:var(--text-primary);box-shadow:var(--shadow-sm)}
+
+/* Task items */
+.tasks-list{padding:0 22px}
+.task-section-lbl{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px}
+.task-item{background:white;border-radius:var(--radius-md);padding:13px 15px;margin-bottom:8px;display:flex;align-items:flex-start;gap:11px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.task-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-top:1px}
+.task-check.checked{background:var(--green);border-color:var(--green)}
+.task-body{flex:1;min-width:0}
+.task-title{font-size:14px;font-weight:500;line-height:1.4}
+.task-title.done{text-decoration:line-through;color:var(--text-tertiary)}
+.task-meta{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;align-items:center}
+.task-tag{font-size:11px;padding:2px 8px;border-radius:100px;font-weight:500}
+.tag-high{background:var(--red-light);color:var(--red)}
+.tag-med{background:var(--accent-light);color:var(--accent-dark)}
+.tag-low{background:var(--green-light);color:var(--green)}
+.tag-cat{background:var(--cream-dark);color:var(--text-secondary)}
+.tag-rec{background:var(--blue-light);color:var(--blue)}
+.task-time-lbl{font-size:11px;color:var(--text-tertiary);display:flex;align-items:center;gap:3px}
+
+/* Routine section in tasks */
+.routine-section{margin-bottom:20px}
+.routine-section-hdr{display:flex;align-items:center;gap:10px;padding:12px 15px;background:var(--cream-dark);border-radius:var(--radius-md);margin-bottom:8px;cursor:pointer}
+.routine-section-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.routine-section-name{font-size:14px;font-weight:500;flex:1}
+.routine-section-count{font-size:12px;color:var(--text-tertiary)}
+.routine-mini-progress{height:3px;background:var(--stone);border-radius:2px;margin-top:6px;overflow:hidden}
+.routine-mini-progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+
+/* ASSISTANT */
+.assistant-header{padding:52px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.assistant-title{font-family:var(--font-display);font-size:28px}
+.clear-btn{background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-family:var(--font-body);font-size:13px;display:flex;align-items:center;gap:4px;padding:6px}
+.chat-area{flex:1;overflow-y:auto;padding:18px 18px 100px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:86%;animation:fadeUp .3s ease}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg-bubble{padding:12px 16px;border-radius:var(--radius-lg);font-size:14px;line-height:1.6}
+.msg.user .msg-bubble{background:var(--text-primary);color:white;border-radius:var(--radius-lg) var(--radius-lg) 4px var(--radius-lg)}
+.msg.ai .msg-bubble{background:white;color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px}
+.msg-time{font-size:11px;color:var(--text-tertiary);margin-top:3px;padding:0 4px}
+.msg.user .msg-time{text-align:right}
+.chat-bar{position:fixed;bottom:var(--tab-height);left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:10px 14px;background:rgba(250,248,245,.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end;z-index:50}
+.chat-input{flex:1;background:white;border:1.5px solid var(--border);border-radius:22px;padding:10px 16px;font-family:var(--font-body);font-size:14px;color:var(--text-primary);outline:none;resize:none;max-height:120px;min-height:44px;line-height:1.5;transition:border-color .2s}
+.chat-input:focus{border-color:var(--accent)}
+.chat-input::placeholder{color:var(--text-tertiary)}
+.send-btn{width:44px;height:44px;background:var(--text-primary);border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;transition:transform .15s}
+.send-btn:active{transform:scale(.93)}
+.send-btn:disabled{background:var(--stone);cursor:default}
+.typing-indicator{display:flex;gap:4px;padding:4px 0}
+.typing-dot{width:7px;height:7px;background:var(--text-tertiary);border-radius:50%;animation:typingBounce 1.2s infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+
+/* SHEETS & MODALS */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.sheet{background:var(--cream);border-radius:var(--radius-xl) var(--radius-xl) 0 0;width:100%;max-width:430px;padding:10px 22px 44px;max-height:88vh;overflow-y:auto;animation:slideUp .28s ease}
+.sheet-handle{width:36px;height:4px;background:var(--stone);border-radius:2px;margin:0 auto 18px}
+.sheet-title{font-family:var(--font-display);font-size:22px;margin-bottom:16px}
+
+/* NL Task input */
+.nl-wrap{background:white;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:13px 15px;margin-bottom:12px;transition:border-color .2s}
+.nl-wrap:focus-within{border-color:var(--accent)}
+.nl-input{width:100%;border:none;outline:none;font-family:var(--font-body);font-size:15px;color:var(--text-primary);background:transparent;resize:none;min-height:56px}
+.nl-input::placeholder{color:var(--text-tertiary)}
+.nl-hint{font-size:12px;color:var(--text-tertiary);margin-bottom:10px}
+.nl-examples{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.nl-ex{padding:7px 12px;background:var(--cream-dark);border-radius:100px;font-size:12px;color:var(--text-secondary);cursor:pointer;border:none;font-family:var(--font-body)}
+.parsed-preview{background:white;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:15px;margin-bottom:14px;display:none}
+.parsed-preview.show{display:block}
+.parsed-lbl{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.parsed-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:13px}
+.parsed-row:last-child{margin-bottom:0}
+.parsed-key{color:var(--text-tertiary);min-width:72px}
+.parsed-val{color:var(--text-primary);font-weight:500}
+
+/* Routine task builder sheet */
+.rbt-field{margin-bottom:14px}
+.rbt-label{font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;display:block}
+
+/* Overdue modal */
+.od-action-row{display:flex;gap:8px;margin-bottom:10px}
+.od-btn{flex:1;padding:11px 6px;border-radius:var(--radius-md);font-family:var(--font-body);font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:white;color:var(--text-primary);display:flex;align-items:center;justify-content:center;gap:6px}
+.od-btn.danger{color:var(--red);border-color:#E8C5C5;background:var(--red-light)}
+.od-btn.ai{color:var(--accent-dark);border-color:#E8D5C0;background:var(--accent-light);width:100%;margin-bottom:14px}
+
+/* API key toggle */
+.api-wrap{position:relative}
+.api-wrap .field-input{padding-right:44px;font-family:monospace;font-size:13px}
+.api-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-tertiary);padding:4px}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.spinner{width:18px;height:18px;border:2px solid var(--stone);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+.empty-state{text-align:center;padding:36px 20px;color:var(--text-tertiary);font-size:14px;line-height:1.6}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.toast{position:fixed;bottom:calc(var(--tab-height) + 14px);left:50%;transform:translateX(-50%);background:var(--text-primary);color:white;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:500;z-index:600;animation:fadeUp .3s ease;white-space:nowrap;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- LANDING -->
+<div id="screen-landing" class="screen">
+  <div class="landing-art">
+    <svg viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="90" cy="90" r="72" fill="#F5EBE0"/>
+      <circle cx="90" cy="90" r="50" fill="#EDD9C3"/>
+      <circle cx="90" cy="90" r="28" fill="#C4956A" opacity=".55"/>
+      <circle cx="90" cy="65" r="7" fill="#C4956A"/>
+      <path d="M72 100 Q90 118 108 100" stroke="#9E7250" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <circle cx="78" cy="88" r="3" fill="#9E7250"/>
+      <circle cx="102" cy="88" r="3" fill="#9E7250"/>
+    </svg>
+  </div>
+  <div class="landing-logo">Clio</div>
+  <div class="landing-tagline">Your calm, personal assistant.<br>Here whenever you need her.</div>
+  <button class="btn-primary" onclick="signInGoogle()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+    Continue with Google
+  </button>
+</div>
+
+<!-- WIZARD -->
+<div id="screen-wizard" class="screen">
+  <div class="wiz-header">
+    <div class="wiz-progress" id="wiz-progress"></div>
+    <div class="wiz-step-lbl" id="wiz-step-lbl"></div>
+    <div class="wiz-title" id="wiz-title"></div>
+    <div class="wiz-sub" id="wiz-sub"></div>
+  </div>
+  <div class="wiz-body" id="wiz-body"></div>
+  <div class="wiz-footer">
+    <button class="btn-primary" id="wiz-next-btn" onclick="wizNext()">Continue</button>
+    <button class="btn-secondary" id="wiz-back-btn" onclick="wizBack()" style="display:none">Go back</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="screen-app" class="screen">
+  <div class="app-content" id="app-content">
+
+    <!-- HOME TAB -->
+    <div id="tab-home">
+      <div class="home-header">
+        <div class="home-time-lbl" id="home-time-lbl">Good morning</div>
+        <div class="home-greeting">Hello, <em id="home-name">there</em></div>
+      </div>
+      <div style="padding:0 22px">
+        <!-- Unfinished routine prompt -->
+        <div id="unfinished-prompt" style="display:none" class="routine-prompt-card">
+          <div class="routine-prompt-title" id="unfinished-prompt-text"></div>
+          <div class="prompt-btn-row">
+            <button class="prompt-btn primary" onclick="dismissUnfinishedPrompt('finish')">Finish it</button>
+            <button class="prompt-btn" onclick="dismissUnfinishedPrompt('skip')">Move on</button>
+          </div>
+        </div>
+        <!-- Current routine callout -->
+        <div id="routine-callout" class="callout-box routine-box" style="display:none">
+          <div class="callout-header">
+            <div class="callout-title light" id="routine-callout-title">Morning Routine</div>
+            <svg id="progress-ring-svg" width="40" height="40" viewBox="0 0 40 40">
+              <circle class="progress-ring-bg" cx="20" cy="20" r="16"/>
+              <circle class="progress-ring-fill" id="progress-ring-fill" cx="20" cy="20" r="16" stroke-dasharray="100.5" stroke-dashoffset="100.5"/>
+            </svg>
+          </div>
+          <div class="progress-ring-wrap">
+            <div>
+              <div class="progress-fraction" id="routine-progress-fraction">0/0</div>
+              <div class="progress-text" id="routine-progress-text">tasks completed</div>
+            </div>
+          </div>
+          <div id="routine-callout-tasks"></div>
+          <button style="margin-top:12px;background:rgba(255,255,255,.12);border:none;border-radius:100px;padding:8px 16px;font-family:var(--font-body);font-size:12px;color:rgba(255,255,255,.8);cursor:pointer" onclick="switchTab('tasks');setTasksView('routines')">View full routine</button>
+        </div>
+        <!-- No routine message -->
+        <div id="goodnight-card" class="callout-box" style="background:var(--cream-dark);display:none">
+          <div style="font-family:var(--font-display);font-size:20px;margin-bottom:6px">Good night</div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.5" id="goodnight-text">Rest well. Your tasks will be ready for you tomorrow.</div>
+        </div>
+        <!-- Top tasks callout -->
+        <div class="callout-box tasks-box">
+          <div class="callout-header">
+            <div class="callout-title dark">Up next</div>
+            <button class="section-action" onclick="switchTab('tasks')">See all</button>
+          </div>
+          <div id="home-top-tasks">
+            <div class="empty-state" style="padding:12px 0;font-size:13px">No tasks yet — tap Tasks to add some</div>
+          </div>
+        </div>
+        <!-- Weather -->
+        <div class="weather-row" id="weather-row">
+          <i data-lucide="cloud" style="width:28px;height:28px;color:var(--blue);flex-shrink:0"></i>
+          <div>
+            <div class="weather-temp" id="weather-temp">--°F</div>
+            <div class="weather-desc" id="weather-desc">Loading weather...</div>
+          </div>
+        </div>
+        <!-- AI greeting -->
+        <div style="background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:20px;font-size:14px;line-height:1.6;color:var(--text-secondary)" id="ai-home-greeting">
+          <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Clio says</div>
+          <div id="ai-greeting-text">Loading your daily overview...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASKS TAB -->
+    <div id="tab-tasks" style="display:none">
+      <div class="tasks-header">
+        <div class="tasks-title" id="tasks-tab-title">Tasks</div>
+        <button class="add-btn" id="tasks-add-btn" onclick="openAddSheet()">
+          <i data-lucide="plus" style="width:22px;height:22px"></i>
+        </button>
+      </div>
+      <div class="toggle-wrap">
+        <button class="toggle-btn active" id="toggle-tasks" onclick="setTasksView('tasks')">Tasks</button>
+        <button class="toggle-btn" id="toggle-routines" onclick="setTasksView('routines')">Routines</button>
+      </div>
+      <div class="tasks-list" id="tasks-list-area"></div>
+    </div>
+
+    <!-- ASSISTANT TAB -->
+    <div id="tab-assistant" style="display:none;flex-direction:column;height:100%">
+      <div class="assistant-header">
+        <div class="assistant-title">Assistant</div>
+        <button class="clear-btn" onclick="clearChat()">
+          <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i> New chat
+        </button>
+      </div>
+      <div class="chat-area" id="chat-area"></div>
+      <div class="chat-bar">
+        <textarea class="chat-input" id="chat-input" placeholder="How are you feeling today?" rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+          oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMsg()">
+          <i data-lucide="arrow-up" style="width:18px;height:18px"></i>
+        </button>
+      </div>
+    </div>
+
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item active" id="tab-btn-home" onclick="switchTab('home')">
+      <i data-lucide="home" style="width:22px;height:22px"></i><span>Home</span>
+    </button>
+    <button class="tab-item" id="tab-btn-tasks" onclick="switchTab('tasks')">
+      <i data-lucide="check-square" style="width:22px;height:22px"></i><span>Tasks</span>
+    </button>
+    <button class="tab-item" id="tab-btn-assistant" onclick="switchTab('assistant')">
+      <i data-lucide="message-circle" style="width:22px;height:22px"></i><span>Assistant</span>
+    </button>
+  </div>
+</div>
+</div>
+
+<!-- ADD TASK SHEET -->
+<div class="overlay" id="add-task-overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Add a task</div>
+    <div class="nl-wrap"><textarea class="nl-input" id="nl-input" placeholder="Describe your task..." rows="3"></textarea></div>
+    <div class="nl-hint">Clio will parse the details — just describe it naturally</div>
+    <div class="nl-examples">
+      <button class="nl-ex" onclick="setEx(this)">Call dentist Friday</button>
+      <button class="nl-ex" onclick="setEx(this)">Change AC filter every 3 months</button>
+      <button class="nl-ex" onclick="setEx(this)">Board meeting prep every 1st Thursday</button>
+      <button class="nl-ex" onclick="setEx(this)">Pick up kids at 3pm today</button>
+    </div>
+    <div class="parsed-preview" id="parsed-preview">
+      <div class="parsed-lbl">Clio parsed this as</div>
+      <div id="parsed-fields"></div>
+    </div>
+    <button class="btn-primary" id="parse-save-btn" onclick="parseOrSave()">Parse with Clio</button>
+    <button class="btn-secondary" onclick="closeAddSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- ADD ROUTINE TASK SHEET -->
+<div class="overlay" id="add-routine-task-overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="art-title">Add routine task</div>
+    <div class="rbt-field">
+      <label class="rbt-label">Task name</label>
+      <input class="field-input" id="rbt-name" placeholder="e.g. Make the bed">
+    </div>
+    <div class="rbt-field">
+      <label class="rbt-label">Time</label>
+      <input class="field-input" id="rbt-time" type="time">
+    </div>
+    <div class="rbt-field">
+      <label class="rbt-label">Estimated time</label>
+      <select class="field-input" id="rbt-est">
+        <option value="">— optional —</option>
+        <option>5 min</option><option>10 min</option><option>15 min</option>
+        <option>20 min</option><option>30 min</option><option>45 min</option><option>1 hr</option>
+      </select>
+    </div>
+    <div class="rbt-field">
+      <label class="rbt-label">Priority</label>
+      <select class="field-input" id="rbt-priority">
+        <option value="">— optional —</option>
+        <option value="high">High</option><option value="med">Medium</option><option value="low">Low</option>
+      </select>
+    </div>
+    <div class="rbt-field">
+      <label class="rbt-label">Which days?</label>
+      <div class="days-row" id="rbt-days">
+        <div class="day-chip selected" data-day="0" onclick="toggleDay(this)">Su</div>
+        <div class="day-chip selected" data-day="1" onclick="toggleDay(this)">Mo</div>
+        <div class="day-chip selected" data-day="2" onclick="toggleDay(this)">Tu</div>
+        <div class="day-chip selected" data-day="3" onclick="toggleDay(this)">We</div>
+        <div class="day-chip selected" data-day="4" onclick="toggleDay(this)">Th</div>
+        <div class="day-chip selected" data-day="5" onclick="toggleDay(this)">Fr</div>
+        <div class="day-chip selected" data-day="6" onclick="toggleDay(this)">Sa</div>
+      </div>
+    </div>
+    <div class="rbt-field">
+      <label class="rbt-label">Notes</label>
+      <textarea class="field-input" id="rbt-notes" placeholder="Optional notes..." style="min-height:60px"></textarea>
+    </div>
+    <button class="btn-primary" onclick="saveRoutineTask()">Add to routine</button>
+    <button class="btn-secondary" onclick="closeRoutineTaskSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- OVERDUE MODAL -->
+<div class="overlay" id="overdue-overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Overdue tasks</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px" id="od-sub"></div>
+    <div class="od-action-row">
+      <button class="od-btn" onclick="postponeAllOverdue()"><i data-lucide="calendar-plus" style="width:15px;height:15px"></i> Postpone all</button>
+      <button class="od-btn danger" onclick="deleteAllOverdue()"><i data-lucide="trash-2" style="width:15px;height:15px"></i> Delete all</button>
+    </div>
+    <button class="od-btn ai" onclick="talkAboutOverdue()"><i data-lucide="sparkles" style="width:15px;height:15px"></i> Talk to Clio about them</button>
+    <div id="od-list"></div>
+    <button class="btn-secondary" onclick="closeOverdue()" style="margin-top:10px">Close</button>
+  </div>
+</div>
+
+<script>
+const GEMINI_KEY = 'AIzaSyA0UQ2R7iq73uuGYfJaBZL-sPUQPkfigWc';
+const WEATHER_KEY = '40325d244705393e0ac5f448b300bd5b';
+
+// Time periods
+const PERIODS = {
+  morning:  { name:'Morning Routine',  start:5*60,   end:12*60,    color:'#C4956A', icon:'sunrise' },
+  midday:   { name:'Midday Routine',   start:12*60+1, end:17*60+30, color:'#4A7BA7', icon:'sun' },
+  evening:  { name:'Evening Routine',  start:17*60+31,end:23*60+59, color:'#7B6BA8', icon:'sunset' },
+  goodnight:{ name:'Good Night',       start:0,       end:4*60+59,  color:'#1A1814', icon:'moon' }
+};
+
+function getCurrentPeriod() {
+  const now = new Date();
+  const mins = now.getHours()*60 + now.getMinutes();
+  if (mins >= 5*60 && mins <= 12*60) return 'morning';
+  if (mins >= 12*60+1 && mins <= 17*60+30) return 'midday';
+  if (mins >= 17*60+31 && mins <= 23*60+59) return 'evening';
+  return 'goodnight';
+}
+
+// State
+let tasks = [];
+let routines = {}; // { morning: [{id,name,time,estTime,priority,days,notes,completed,completedDate},...], midday:[...], evening:[...] }
+let chatHistory = [];
+let parsedTask = null;
+let currentTasksView = 'tasks';
+let editingRoutine = null;
+let wizData = {};
+let wizStep = 0;
+
+// ── SCREEN MANAGEMENT ──
+function showLanding() { setScreen('screen-landing'); lucide.createIcons(); }
+function showWizard()  { setScreen('screen-wizard'); renderWizStep(); lucide.createIcons(); }
+function showApp()     { setScreen('screen-app'); initApp(); lucide.createIcons(); }
+function setScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+// ── AUTH ──
+async function signInGoogle() {
+  const {auth,signInWithPopup,GoogleAuthProvider} = window._fb;
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch(e) { showToast('Sign in failed. Please try again.'); }
+}
+
+// ── WIZARD ──
+const WIZ_STEPS = [
+  {
+    lbl:'Step 1 of 8', title:"Hi! What's your name?", sub:'Clio will use this to greet you each day.',
+    render:()=>`
+      <div class="field"><label class="field-label">Your first name</label><input class="field-input" id="w-name" placeholder="e.g. Brittney" value="${wizData.name||''}"></div>
+      <div class="field"><label class="field-label">A little about you <span style="color:var(--text-tertiary)">(optional)</span></label><textarea class="field-input" id="w-about" placeholder="e.g. Mom of 3, nonprofit director, loves hiking...">${wizData.about||''}</textarea></div>`,
+    save:()=>{ wizData.name=document.getElementById('w-name').value.trim(); wizData.about=document.getElementById('w-about').value.trim(); return wizData.name.length>0; }
+  },
+  {
+    lbl:'Step 2 of 8', title:'Who\'s in your life?', sub:'Clio will recognize them when you mention them.',
+    render:()=>{
+      const people = wizData.people||[];
+      return `<div id="wiz-people">${people.map((p,i)=>`
+        <div class="routine-card" style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1"><div style="font-size:14px;font-weight:500">${p.name}</div><div style="font-size:12px;color:var(--text-tertiary)">${p.role}</div></div>
+          <button onclick="wizRemovePerson(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary)"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+        </div>`).join('')}</div>
+        <button class="add-routine-task-btn" onclick="wizShowAddPerson()"><i data-lucide="plus" style="width:15px;height:15px"></i> Add a person</button>
+        <div id="wiz-add-person-form" style="display:none;margin-top:14px">
+          <div class="field"><label class="field-label">Name</label><input class="field-input" id="wiz-pname" placeholder="e.g. Emma"></div>
+          <div class="field"><label class="field-label">Relationship</label><input class="field-input" id="wiz-prole" placeholder="e.g. Daughter, age 8"></div>
+          <button class="btn-primary" onclick="wizAddPerson()" style="margin-bottom:8px">Add</button>
+        </div>`;
+    },
+    save:()=>true
+  },
+  {
+    lbl:'Step 3 of 8', title:'What areas of life\ndo you manage?', sub:'Clio uses these to organize and suggest tasks.',
+    render:()=>{
+      const sel = wizData.lifeAreas||[];
+      return `<div class="chip-group">${['Family & home','Health & fitness','Personal projects','Social & relationships','Volunteer activities','Work & career','Finance','Self-care'].map(a=>`<div class="chip ${sel.includes(a)?'selected':''}" onclick="wizToggleChip(this,'lifeAreas','${a}')">${a}</div>`).join('')}</div>`;
+    },
+    save:()=>(wizData.lifeAreas||[]).length>0
+  },
+  {
+    lbl:'Step 4 of 8', title:'Which routines\ndo you want to set up?', sub:"You'll build each one in the next steps.",
+    render:()=>{
+      const sel = wizData.selectedRoutines||[];
+      return `<div style="display:flex;flex-direction:column;gap:10px">
+        ${[{key:'morning',label:'Morning Routine',sub:'5:00 AM – 12:00 PM',icon:'sunrise'},
+           {key:'midday', label:'Midday Routine', sub:'12:01 PM – 5:30 PM',icon:'sun'},
+           {key:'evening',label:'Evening Routine',sub:'5:31 PM – 11:59 PM',icon:'sunset'}].map(r=>`
+          <div class="routine-card" style="cursor:pointer;border-color:${sel.includes(r.key)?'var(--text-primary)':'var(--border)'};background:${sel.includes(r.key)?'var(--text-primary)':'white'}" onclick="wizToggleRoutine(this,'${r.key}')">
+            <div style="display:flex;align-items:center;gap:12px">
+              <i data-lucide="${r.icon}" style="width:20px;height:20px;color:${sel.includes(r.key)?'white':'var(--accent)'}"></i>
+              <div><div style="font-size:14px;font-weight:500;color:${sel.includes(r.key)?'white':'var(--text-primary)'}">${r.label}</div><div style="font-size:12px;color:${sel.includes(r.key)?'rgba(255,255,255,.6)':'var(--text-tertiary)'}">${r.sub}</div></div>
+            </div>
+          </div>`).join('')}
+        </div>`;
+    },
+    save:()=>(wizData.selectedRoutines||[]).length>0
+  },
+  {
+    lbl:'Step 5 of 8', title:'Build your\nMorning Routine', sub:'Add tasks you do every morning. You can always edit these later.',
+    shouldSkip:()=>!(wizData.selectedRoutines||[]).includes('morning'),
+    render:()=>wizRenderRoutineBuilder('morning'),
+    save:()=>true
+  },
+  {
+    lbl:'Step 6 of 8', title:'Build your\nMidday Routine', sub:'Add tasks you do each afternoon.',
+    shouldSkip:()=>!(wizData.selectedRoutines||[]).includes('midday'),
+    render:()=>wizRenderRoutineBuilder('midday'),
+    save:()=>true
+  },
+  {
+    lbl:'Step 7 of 8', title:'Build your\nEvening Routine', sub:'Add tasks for your evenings.',
+    shouldSkip:()=>!(wizData.selectedRoutines||[]).includes('evening'),
+    render:()=>wizRenderRoutineBuilder('evening'),
+    save:()=>true
+  },
+  {
+    lbl:'Step 8 of 8', title:'Your Gemini API key', sub:'This powers Clio\'s intelligence. Stored securely, never shared.',
+    render:()=>`
+      <div class="field"><label class="field-label">Gemini API key</label>
+        <div class="api-wrap"><input class="field-input" id="w-gemini" type="password" placeholder="AIza..." value="${wizData.geminiKey||GEMINI_KEY}">
+        <button class="api-toggle" onclick="toggleVis('w-gemini',this)"><i data-lucide="eye" style="width:15px;height:15px"></i></button></div>
+      </div>
+      <div class="info-box"><strong>Free tier:</strong> Google gives you 1,500 free requests/day — plenty for daily personal use.</div>`,
+    save:()=>{ wizData.geminiKey=document.getElementById('w-gemini').value.trim(); return wizData.geminiKey.length>10; }
+  }
+];
+
+function wizRenderRoutineBuilder(period) {
+  const tasks = (wizData.routineTasks||{})[period]||[];
+  return `<div id="wiz-routine-list-${period}">${tasks.map((t,i)=>`
+    <div class="routine-card">
+      <div class="routine-card-header">
+        <span class="routine-card-title">${t.name}</span>
+        <button onclick="wizRemoveRoutineTask('${period}',${i})" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary)"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+      </div>
+      <div class="routine-card-meta">${t.time||''}${t.estTime?' · '+t.estTime:''} · ${t.days.length===7?'Every day':t.days.map(d=>['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(', ')}</div>
+    </div>`).join('')}
+    </div>
+    <button class="add-routine-task-btn" onclick="wizOpenAddRoutineTask('${period}')"><i data-lucide="plus" style="width:15px;height:15px"></i> Add a task</button>
+    <div id="wiz-inline-task-form-${period}" style="display:none;margin-top:16px;background:white;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:16px">
+      <div class="rbt-field"><label class="rbt-label">Task name</label><input class="field-input" id="wit-name-${period}" placeholder="e.g. Make the bed"></div>
+      <div class="rbt-field"><label class="rbt-label">Time</label><input class="field-input" id="wit-time-${period}" type="time"></div>
+      <div class="rbt-field"><label class="rbt-label">Estimated time</label>
+        <select class="field-input" id="wit-est-${period}"><option value="">—</option><option>5 min</option><option>10 min</option><option>15 min</option><option>20 min</option><option>30 min</option><option>45 min</option><option>1 hr</option></select>
+      </div>
+      <div class="rbt-field"><label class="rbt-label">Which days?</label>
+        <div class="days-row" id="wit-days-${period}">
+          ${['Su','Mo','Tu','We','Th','Fr','Sa'].map((d,i)=>`<div class="day-chip selected" data-day="${i}" onclick="toggleDay(this)">${d}</div>`).join('')}
+        </div>
+      </div>
+      <button class="btn-primary" onclick="wizSaveInlineTask('${period}')" style="margin-bottom:8px">Add task</button>
+      <button class="btn-secondary" onclick="document.getElementById('wiz-inline-task-form-${period}').style.display='none'">Cancel</button>
+    </div>`;
+}
+
+function wizOpenAddRoutineTask(period) {
+  document.getElementById(`wiz-inline-task-form-${period}`).style.display='block';
+  lucide.createIcons();
+}
+function wizSaveInlineTask(period) {
+  const name = document.getElementById(`wit-name-${period}`).value.trim();
+  if (!name) { showToast('Please enter a task name'); return; }
+  const days = [...document.getElementById(`wit-days-${period}`).querySelectorAll('.day-chip.selected')].map(d=>parseInt(d.dataset.day));
+  if (!wizData.routineTasks) wizData.routineTasks = {};
+  if (!wizData.routineTasks[period]) wizData.routineTasks[period] = [];
+  wizData.routineTasks[period].push({
+    name, time:document.getElementById(`wit-time-${period}`).value,
+    estTime:document.getElementById(`wit-est-${period}`).value,
+    days: days.length>0?days:[0,1,2,3,4,5,6], priority:'', notes:''
+  });
+  renderWizStep();
+}
+function wizRemoveRoutineTask(period, i) {
+  wizData.routineTasks[period].splice(i,1);
+  renderWizStep();
+}
+function wizToggleRoutine(el, key) {
+  if (!wizData.selectedRoutines) wizData.selectedRoutines=[];
+  if (wizData.selectedRoutines.includes(key)) wizData.selectedRoutines=wizData.selectedRoutines.filter(k=>k!==key);
+  else wizData.selectedRoutines.push(key);
+  renderWizStep();
+}
+function wizToggleChip(el, key, val) {
+  if (!wizData[key]) wizData[key]=[];
+  if (wizData[key].includes(val)) { wizData[key]=wizData[key].filter(v=>v!==val); el.classList.remove('selected'); }
+  else { wizData[key].push(val); el.classList.add('selected'); }
+}
+function wizShowAddPerson() { document.getElementById('wiz-add-person-form').style.display='block'; }
+function wizAddPerson() {
+  const n=document.getElementById('wiz-pname').value.trim(), r=document.getElementById('wiz-prole').value.trim();
+  if (!n) return;
+  if (!wizData.people) wizData.people=[];
+  wizData.people.push({name:n,role:r});
+  renderWizStep();
+}
+function wizRemovePerson(i) { wizData.people.splice(i,1); renderWizStep(); }
+
+function renderWizStep() {
+  // Skip steps if needed
+  while (wizStep < WIZ_STEPS.length && WIZ_STEPS[wizStep].shouldSkip && WIZ_STEPS[wizStep].shouldSkip()) { wizStep++; }
+  if (wizStep >= WIZ_STEPS.length) { saveProfileAndContinue(); return; }
+  const step = WIZ_STEPS[wizStep];
+  const totalVisible = WIZ_STEPS.filter(s=>!s.shouldSkip||!s.shouldSkip()).length;
+  document.getElementById('wiz-progress').innerHTML = WIZ_STEPS.map((_,i)=>`<div class="wiz-dot ${i<wizStep?'done':i===wizStep?'active':''}"></div>`).join('');
+  document.getElementById('wiz-step-lbl').textContent = step.lbl;
+  document.getElementById('wiz-title').textContent = step.title;
+  document.getElementById('wiz-sub').textContent = step.sub;
+  document.getElementById('wiz-body').innerHTML = step.render();
+  document.getElementById('wiz-next-btn').textContent = wizStep===WIZ_STEPS.length-1?'Start using Clio':'Continue';
+  document.getElementById('wiz-back-btn').style.display = wizStep>0?'block':'none';
+  lucide.createIcons();
+}
+function wizNext() {
+  const step = WIZ_STEPS[wizStep];
+  if (!step.save()) { showToast('Please complete this step first'); return; }
+  wizStep++;
+  renderWizStep();
+}
+function wizBack() { if(wizStep>0){wizStep--;renderWizStep();} }
+async function saveProfileAndContinue() {
+  const btn = document.getElementById('wiz-next-btn');
+  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  const {db,doc,setDoc,collection,addDoc} = window._fb;
+  const profile = {...wizData, setupComplete:true, createdAt:new Date().toISOString()};
+  await setDoc(doc(db,'users',window._user.uid), profile);
+  window._profile = profile;
+  // Save routine tasks to firestore
+  const rt = wizData.routineTasks||{};
+  for (const period of ['morning','midday','evening']) {
+    const items = rt[period]||[];
+    for (const item of items) {
+      await addDoc(collection(db,'users',window._user.uid,'routineTasks'), {...item, period, completed:false, completedDate:''});
+    }
+  }
+  showApp();
+}
+function toggleVis(id,btn) {
+  const el=document.getElementById(id);
+  el.type=el.type==='password'?'text':'password';
+  btn.innerHTML=`<i data-lucide="${el.type==='password'?'eye':'eye-off'}" style="width:15px;height:15px"></i>`;
+  lucide.createIcons();
+}
+
+// ── APP INIT ──
+async function initApp() {
+  const p = window._profile||{};
+  const hour = new Date().getHours();
+  const period = getCurrentPeriod();
+  const labels = {morning:'Good morning',midday:'Good afternoon',evening:'Good evening',goodnight:'Good night'};
+  document.getElementById('home-time-lbl').textContent = labels[period]||'Hello';
+  document.getElementById('home-name').textContent = p.name||'there';
+  await Promise.all([loadTasks(), loadRoutines()]);
+  renderHome();
+  loadWeather();
+  initChat();
+  generateHomeGreeting();
+  checkMidnightReset();
+}
+
+// ── WEATHER ──
+async function loadWeather() {
+  try {
+    const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=Bakersfield,CA,US&appid=${WEATHER_KEY}&units=imperial`);
+    const d = await r.json();
+    if (d.main) {
+      document.getElementById('weather-temp').textContent = Math.round(d.main.temp)+'°F';
+      document.getElementById('weather-desc').textContent = d.weather[0].description.replace(/\b\w/g,l=>l.toUpperCase())+' · Bakersfield, CA';
+      const icons={Clear:'sun',Clouds:'cloud',Rain:'cloud-rain',Snow:'cloud-snow',Thunderstorm:'cloud-lightning',Drizzle:'cloud-drizzle',Mist:'wind',Fog:'wind'};
+      document.querySelector('#weather-row i').setAttribute('data-lucide', icons[d.weather[0].main]||'cloud');
+      lucide.createIcons();
+    }
+  } catch(e){}
+}
+
+// ── ROUTINES ──
+async function loadRoutines() {
+  const {db,collection,getDocs} = window._fb;
+  routines = {morning:[],midday:[],evening:[]};
+  try {
+    const snap = await getDocs(collection(db,'users',window._user.uid,'routineTasks'));
+    snap.docs.forEach(d=>{
+      const data = {id:d.id,...d.data()};
+      if (routines[data.period]) routines[data.period].push(data);
+    });
+  } catch(e){}
+}
+
+function getTodayRoutineTasks(period) {
+  const dayOfWeek = new Date().getDay();
+  return (routines[period]||[]).filter(t=>!t.days||t.days.includes(dayOfWeek));
+}
+
+function checkMidnightReset() {
+  // Reset completed status at midnight
+  const now = new Date();
+  const lastReset = localStorage.getItem('clio-last-reset');
+  const today = now.toDateString();
+  if (lastReset !== today) {
+    // Reset all routine completions
+    Object.values(routines).flat().forEach(t=>{ t.completed=false; t.completedDate=''; });
+    localStorage.setItem('clio-last-reset', today);
+    // Persist resets to firestore
+    updateAllRoutineCompletions();
+  }
+}
+
+async function updateAllRoutineCompletions() {
+  const {db,doc,updateDoc} = window._fb;
+  const today = new Date().toDateString();
+  for (const period of ['morning','midday','evening']) {
+    for (const t of routines[period]||[]) {
+      if (t.completedDate !== today) {
+        try { await updateDoc(doc(db,'users',window._user.uid,'routineTasks',t.id),{completed:false,completedDate:''}); } catch(e){}
+      }
+    }
+  }
+}
+
+// ── HOME RENDER ──
+function renderHome() {
+  const period = getCurrentPeriod();
+  const todayTasks = period !== 'goodnight' ? getTodayRoutineTasks(period) : [];
+  const completed = todayTasks.filter(t=>t.completed).length;
+  const total = todayTasks.length;
+
+  // Check for unfinished previous routine
+  checkUnfinishedRoutine();
+
+  // Goodnight
+  const gn = document.getElementById('goodnight-card');
+  const rc = document.getElementById('routine-callout');
+  if (period === 'goodnight') {
+    gn.style.display='block'; rc.style.display='none';
+    generateGoodNightMessage();
+  } else {
+    gn.style.display='none';
+    if (total > 0) {
+      rc.style.display='block';
+      renderRoutineCallout(period, todayTasks, completed, total);
+    } else {
+      rc.style.display='none';
+    }
+  }
+  renderTopTasks();
+}
+
+function renderRoutineCallout(period, tasks, completed, total) {
+  document.getElementById('routine-callout-title').textContent = PERIODS[period]?.name||'Routine';
+  document.getElementById('routine-progress-fraction').textContent = `${completed}/${total}`;
+  document.getElementById('routine-progress-text').textContent = 'tasks completed';
+
+  // Progress ring
+  const circumference = 100.5;
+  const offset = circumference - (completed/total)*circumference;
+  document.getElementById('progress-ring-fill').style.strokeDashoffset = offset;
+
+  // Tasks (show up to 4)
+  const taskHTML = tasks.slice(0,4).map(t=>`
+    <div class="callout-task">
+      <div class="callout-task-check ${t.completed?'checked':''}" onclick="toggleRoutineTask('${t.id}','${period}')">
+        ${t.completed?`<i data-lucide="check" style="width:11px;height:11px;color:var(--text-primary)"></i>`:''}
+      </div>
+      <div class="callout-task-name ${t.completed?'done':''}">${t.name}</div>
+      ${t.time?`<div class="callout-task-time">${formatTime(t.time)}</div>`:''}
+    </div>`).join('');
+  document.getElementById('routine-callout-tasks').innerHTML = taskHTML;
+  lucide.createIcons();
+}
+
+function checkUnfinishedRoutine() {
+  const period = getCurrentPeriod();
+  if (period === 'goodnight' || period === 'morning') { document.getElementById('unfinished-prompt').style.display='none'; return; }
+  const prev = period === 'midday' ? 'morning' : 'midday';
+  const prevTasks = getTodayRoutineTasks(prev);
+  if (prevTasks.length === 0) { document.getElementById('unfinished-prompt').style.display='none'; return; }
+  const incomplete = prevTasks.filter(t=>!t.completed);
+  if (incomplete.length === 0) { document.getElementById('unfinished-prompt').style.display='none'; return; }
+  const prevName = PERIODS[prev].name;
+  document.getElementById('unfinished-prompt-text').textContent = `You have ${incomplete.length} unfinished task${incomplete.length>1?'s':''} from your ${prevName}. Would you like to finish ${incomplete.length>1?'them':'it'} or move on?`;
+  document.getElementById('unfinished-prompt').style.display='block';
+}
+
+function dismissUnfinishedPrompt(action) {
+  document.getElementById('unfinished-prompt').style.display='none';
+  if (action === 'finish') {
+    const period = getCurrentPeriod();
+    const prev = period === 'midday' ? 'morning' : 'midday';
+    switchTab('tasks'); setTasksView('routines');
+    // Scroll to the right routine section
+    setTimeout(()=>{
+      const el = document.getElementById(`routine-section-${prev}`);
+      if (el) el.scrollIntoView({behavior:'smooth'});
+    }, 300);
+  }
+}
+
+function renderTopTasks() {
+  const el = document.getElementById('home-top-tasks');
+  const today = new Date().toDateString();
+  const active = tasks.filter(t=>!t.completed);
+  if (active.length === 0) { el.innerHTML=`<div style="font-size:13px;color:var(--text-tertiary);padding:8px 0">All caught up — nothing pending</div>`; return; }
+  const priorityOrder = {high:0,med:1,low:2,'':3};
+  const sorted = [...active].sort((a,b)=>{
+    const aToday = a.dueDate && new Date(a.dueDate).toDateString()===today ? -1 : 0;
+    const bToday = b.dueDate && new Date(b.dueDate).toDateString()===today ? -1 : 0;
+    if (aToday !== bToday) return aToday-bToday;
+    return (priorityOrder[a.priority]||3)-(priorityOrder[b.priority]||3);
+  }).slice(0,3);
+  el.innerHTML = sorted.map(t=>`
+    <div class="top-task-item">
+      <div class="priority-dot ${t.priority||'none'}"></div>
+      <div>
+        <div class="top-task-name">${t.title}</div>
+        ${t.dueDate?`<div class="top-task-due">${new Date(t.dueDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+async function toggleRoutineTask(id, period) {
+  const {db,doc,updateDoc} = window._fb;
+  const task = (routines[period]||[]).find(t=>t.id===id);
+  if (!task) return;
+  task.completed = !task.completed;
+  task.completedDate = new Date().toDateString();
+  try { await updateDoc(doc(db,'users',window._user.uid,'routineTasks',id),{completed:task.completed,completedDate:task.completedDate}); } catch(e){}
+  renderHome();
+  renderTasksArea();
+  if (task.completed) showToast('Done!');
+}
+
+// ── TASKS ──
+async function loadTasks() {
+  const {db,collection,getDocs} = window._fb;
+  tasks = [];
+  try {
+    const snap = await getDocs(collection(db,'users',window._user.uid,'tasks'));
+    tasks = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){}
+}
+
+function setTasksView(view) {
+  currentTasksView = view;
+  const isTasks = view === 'tasks';
+  document.getElementById('toggle-tasks').classList.toggle('active', isTasks);
+  document.getElementById('toggle-routines').classList.toggle('active', !isTasks);
+  document.getElementById('tasks-tab-title').textContent = isTasks ? 'Tasks' : 'Routines';
+  document.getElementById('tasks-add-btn').onclick = isTasks ? openAddSheet : openAddRoutineTaskSheet;
+  renderTasksArea();
+}
+
+function renderTasksArea() {
+  const el = document.getElementById('tasks-list-area');
+  if (currentTasksView === 'tasks') renderTasksList(el);
+  else renderRoutinesList(el);
+}
+
+function renderTasksList(el) {
+  if (tasks.length === 0) {
+    el.innerHTML=`<div class="empty-state"><i data-lucide="list-checks" style="width:32px;height:32px;margin-bottom:10px"></i><br>No tasks yet.<br>Tap + to add your first one.</div>`;
+    lucide.createIcons(); return;
+  }
+  const priority = {high:0,med:1,low:2,'':3};
+  const sorted = [...tasks].sort((a,b)=>{
+    if (a.completed!==b.completed) return a.completed?1:-1;
+    return (priority[a.priority]||3)-(priority[b.priority]||3);
+  });
+  el.innerHTML = sorted.map(t=>`
+    <div class="task-item">
+      <div class="task-check ${t.completed?'checked':''}" onclick="toggleTask('${t.id}')">
+        ${t.completed?`<i data-lucide="check" style="width:12px;height:12px;color:white"></i>`:''}
+      </div>
+      <div class="task-body">
+        <div class="task-title ${t.completed?'done':''}">${t.title}</div>
+        <div class="task-meta">
+          ${t.priority?`<span class="task-tag tag-${t.priority}">${{high:'High',med:'Medium',low:'Low'}[t.priority]}</span>`:''}
+          ${t.category?`<span class="task-tag tag-cat">${t.category}</span>`:''}
+          ${t.recurring?`<span class="task-tag tag-rec">Recurring</span>`:''}
+          ${t.estimatedTime?`<span class="task-time-lbl"><i data-lucide="clock" style="width:10px;height:10px"></i>${t.estimatedTime}</span>`:''}
+        </div>
+      </div>
+    </div>`).join('');
+  lucide.createIcons();
+}
+
+function renderRoutinesList(el) {
+  const periods = ['morning','midday','evening'];
+  const hasAny = periods.some(p=>(routines[p]||[]).length>0);
+  if (!hasAny) {
+    el.innerHTML=`<div class="empty-state"><i data-lucide="sun" style="width:32px;height:32px;margin-bottom:10px"></i><br>No routines yet.<br>Tap + to add routine tasks.</div>`;
+    lucide.createIcons(); return;
+  }
+  el.innerHTML = periods.filter(p=>(routines[p]||[]).length>0).map(p=>{
+    const pInfo = PERIODS[p];
+    const todayTasks = getTodayRoutineTasks(p);
+    const done = todayTasks.filter(t=>t.completed).length;
+    const total = todayTasks.length;
+    const allTasks = routines[p]||[];
+    return `<div class="routine-section" id="routine-section-${p}">
+      <div class="routine-section-hdr" onclick="toggleRoutineSection('${p}')">
+        <div class="routine-section-icon" style="background:var(--accent-light)"><i data-lucide="${pInfo.icon}" style="width:16px;height:16px;color:var(--accent)"></i></div>
+        <div style="flex:1">
+          <div class="routine-section-name">${pInfo.name}</div>
+          <div class="routine-mini-progress"><div class="routine-mini-progress-fill" style="width:${total>0?Math.round(done/total*100):0}%"></div></div>
+        </div>
+        <div class="routine-section-count">${done}/${total} today</div>
+        <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:4px" id="chev-${p}"></i>
+      </div>
+      <div id="routine-tasks-${p}">
+        ${allTasks.map(t=>`
+          <div class="task-item">
+            <div class="task-check ${t.completed?'checked':''}" onclick="toggleRoutineTask('${t.id}','${p}')">
+              ${t.completed?`<i data-lucide="check" style="width:12px;height:12px;color:white"></i>`:''}
+            </div>
+            <div class="task-body">
+              <div class="task-title ${t.completed?'done':''}">${t.name}</div>
+              <div class="task-meta">
+                ${t.time?`<span class="task-time-lbl"><i data-lucide="clock" style="width:10px;height:10px"></i>${formatTime(t.time)}</span>`:''}
+                ${t.estTime?`<span class="task-tag tag-cat">${t.estTime}</span>`:''}
+                ${t.priority?`<span class="task-tag tag-${t.priority}">${{high:'High',med:'Medium',low:'Low'}[t.priority]}</span>`:''}
+                <span class="task-tag tag-rec">${t.days&&t.days.length<7?t.days.map(d=>['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(', '):'Every day'}</span>
+              </div>
+            </div>
+          </div>`).join('')}
+        <button class="add-routine-task-btn" onclick="openAddRoutineTaskSheet('${p}')"><i data-lucide="plus" style="width:14px;height:14px"></i> Add task to ${pInfo.name}</button>
+      </div>
+    </div>`;
+  }).join('');
+  lucide.createIcons();
+}
+
+function toggleRoutineSection(period) {
+  const el = document.getElementById(`routine-tasks-${period}`);
+  const chev = document.getElementById(`chev-${period}`);
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  chev.setAttribute('data-lucide', open ? 'chevron-right' : 'chevron-down');
+  lucide.createIcons();
+}
+
+async function toggleTask(id) {
+  const {db,doc,updateDoc} = window._fb;
+  const task = tasks.find(t=>t.id===id);
+  if (!task) return;
+  task.completed = !task.completed;
+  try { await updateDoc(doc(db,'users',window._user.uid,'tasks',id),{completed:task.completed}); } catch(e){}
+  renderTasksArea(); renderTopTasks();
+  if (task.completed) showToast('Task completed!');
+}
+
+// ── ADD TASK SHEET ──
+function openAddSheet() {
+  document.getElementById('add-task-overlay').classList.add('open');
+  document.getElementById('nl-input').value='';
+  document.getElementById('parsed-preview').classList.remove('show');
+  document.getElementById('parse-save-btn').textContent='Parse with Clio';
+  parsedTask=null;
+  setTimeout(()=>document.getElementById('nl-input').focus(),300);
+}
+function closeAddSheet() { document.getElementById('add-task-overlay').classList.remove('open'); }
+function setEx(btn) { document.getElementById('nl-input').value=btn.textContent; parsedTask=null; document.getElementById('parse-save-btn').textContent='Parse with Clio'; document.getElementById('parsed-preview').classList.remove('show'); }
+
+async function parseOrSave() {
+  if (parsedTask) { await doSaveTask(parsedTask); closeAddSheet(); return; }
+  const input = document.getElementById('nl-input').value.trim();
+  if (!input) return;
+  const btn = document.getElementById('parse-save-btn');
+  btn.innerHTML='<span class="spinner"></span> Parsing...'; btn.disabled=true;
+  const prompt = `Parse this task into JSON. Return ONLY valid JSON, no markdown, no explanation.
+Fields: title(string), dueDate(ISO string or null), priority("high","med","low" or null), category(one of: "Family & home","Health & fitness","Personal projects","Social & relationships","Volunteer" or null), estimatedTime(string like "30 min" or null), recurring(boolean), recurringPattern(string or null), forWho(string or null).
+Task: "${input}"`;
+  try {
+    const r = await callGemini(prompt);
+    const clean = r.replace(/```json|```/g,'').trim();
+    parsedTask = JSON.parse(clean);
+    const pf = document.getElementById('parsed-fields');
+    pf.innerHTML = [
+      ['Task', parsedTask.title],
+      ['Due', parsedTask.dueDate?new Date(parsedTask.dueDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'],
+      ['Priority', parsedTask.priority||'—'],
+      ['Category', parsedTask.category||'—'],
+      ['Est. time', parsedTask.estimatedTime||'—'],
+      ['Recurring', parsedTask.recurring?(parsedTask.recurringPattern||'Yes'):'No'],
+      ['For', parsedTask.forWho||'Me'],
+    ].map(([k,v])=>`<div class="parsed-row"><span class="parsed-key">${k}</span><span class="parsed-val">${v}</span></div>`).join('');
+    document.getElementById('parsed-preview').classList.add('show');
+    btn.textContent='Save task'; btn.disabled=false;
+  } catch(e) { btn.textContent='Parse with Clio'; btn.disabled=false; showToast('Could not parse. Please try again.'); }
+}
+
+async function doSaveTask(data) {
+  const {db,collection,addDoc} = window._fb;
+  const task = {...data, completed:false, createdAt:new Date().toISOString()};
+  const ref = await addDoc(collection(db,'users',window._user.uid,'tasks'), task);
+  tasks.push({id:ref.id,...task});
+  renderTasksArea(); renderTopTasks();
+  showToast('Task added!'); lucide.createIcons();
+}
+
+// ── ADD ROUTINE TASK SHEET ──
+let editingRoutinePeriod = null;
+function openAddRoutineTaskSheet(period) {
+  editingRoutinePeriod = period || getCurrentPeriod();
+  const pInfo = PERIODS[editingRoutinePeriod];
+  document.getElementById('art-title').textContent = `Add to ${pInfo?.name||'Routine'}`;
+  document.getElementById('rbt-name').value='';
+  document.getElementById('rbt-time').value='';
+  document.getElementById('rbt-est').value='';
+  document.getElementById('rbt-priority').value='';
+  document.getElementById('rbt-notes').value='';
+  document.querySelectorAll('#rbt-days .day-chip').forEach(c=>c.classList.add('selected'));
+  document.getElementById('add-routine-task-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('rbt-name').focus(),300);
+}
+function closeRoutineTaskSheet() { document.getElementById('add-routine-task-overlay').classList.remove('open'); }
+function toggleDay(el) { el.classList.toggle('selected'); }
+
+async function saveRoutineTask() {
+  const name = document.getElementById('rbt-name').value.trim();
+  if (!name) { showToast('Please enter a task name'); return; }
+  const days = [...document.querySelectorAll('#rbt-days .day-chip.selected')].map(d=>parseInt(d.dataset.day));
+  const {db,collection,addDoc} = window._fb;
+  const task = {
+    name, period: editingRoutinePeriod,
+    time: document.getElementById('rbt-time').value,
+    estTime: document.getElementById('rbt-est').value,
+    priority: document.getElementById('rbt-priority').value,
+    notes: document.getElementById('rbt-notes').value,
+    days: days.length>0?days:[0,1,2,3,4,5,6],
+    completed:false, completedDate:''
+  };
+  const ref = await addDoc(collection(db,'users',window._user.uid,'routineTasks'), task);
+  if (!routines[editingRoutinePeriod]) routines[editingRoutinePeriod]=[];
+  routines[editingRoutinePeriod].push({id:ref.id,...task});
+  closeRoutineTaskSheet(); renderHome(); renderTasksArea();
+  showToast('Added to routine!');
+}
+
+// ── OVERDUE ──
+function getOverdueTasks() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  return tasks.filter(t=>!t.completed&&t.dueDate&&new Date(t.dueDate)<today);
+}
+function openOverdue() {
+  const od=getOverdueTasks();
+  document.getElementById('od-sub').textContent=`You have ${od.length} task${od.length>1?'s':''} that weren't completed.`;
+  document.getElementById('od-list').innerHTML=od.map(t=>`<div class="task-item"><div class="task-body"><div class="task-title">${t.title}</div></div></div>`).join('');
+  document.getElementById('overdue-overlay').classList.add('open');
+  lucide.createIcons();
+}
+function closeOverdue() { document.getElementById('overdue-overlay').classList.remove('open'); }
+async function postponeAllOverdue() {
+  const {db,doc,updateDoc}=window._fb;
+  const od=getOverdueTasks();
+  const tomorrow=new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+  for(const t of od){t.dueDate=tomorrow.toISOString();try{await updateDoc(doc(db,'users',window._user.uid,'tasks',t.id),{dueDate:t.dueDate});}catch(e){}}
+  closeOverdue(); renderTasksArea(); renderTopTasks(); showToast(`${od.length} tasks moved to tomorrow`);
+}
+async function deleteAllOverdue() {
+  const {db,doc,deleteDoc}=window._fb;
+  const od=getOverdueTasks();
+  for(const t of od){try{await deleteDoc(doc(db,'users',window._user.uid,'tasks',t.id));}catch(e){} tasks=tasks.filter(x=>x.id!==t.id);}
+  closeOverdue(); renderTasksArea(); renderTopTasks(); showToast(`${od.length} tasks deleted`);
+}
+function talkAboutOverdue() {
+  closeOverdue(); const od=getOverdueTasks();
+  switchTab('assistant');
+  setTimeout(()=>{document.getElementById('chat-input').value=`I have ${od.length} overdue tasks I need help with: ${od.map(t=>t.title).join(', ')}`;document.getElementById('chat-input').focus();},400);
+}
+
+// ── AI CHAT ──
+function initChat() {
+  const saved=localStorage.getItem(`clio-chat-${window._user?.uid}`);
+  if(saved){chatHistory=JSON.parse(saved);renderChat();}
+  else{chatHistory=[];addAIMsg("How are you feeling today? I'm here whenever you're ready to talk through your day.");}
+}
+function renderChat() {
+  const area=document.getElementById('chat-area');
+  area.innerHTML=chatHistory.map(m=>msgHTML(m)).join('');
+  area.scrollTop=area.scrollHeight; lucide.createIcons();
+}
+function msgHTML(m) {
+  const time=new Date(m.ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  return `<div class="msg ${m.role}"><div class="msg-bubble">${m.content.replace(/\n/g,'<br>')}</div><div class="msg-time">${time}</div></div>`;
+}
+function addAIMsg(content) {
+  const msg={role:'ai',content,ts:Date.now()};
+  chatHistory.push(msg); saveChat();
+  const area=document.getElementById('chat-area');
+  area.insertAdjacentHTML('beforeend',msgHTML(msg));
+  area.scrollTop=area.scrollHeight;
+}
+function saveChat() { if(window._user) localStorage.setItem(`clio-chat-${window._user.uid}`,JSON.stringify(chatHistory.slice(-100))); }
+
+async function sendMsg() {
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim(); if(!text) return;
+  input.value=''; autoResize(input);
+  const userMsg={role:'user',content:text,ts:Date.now()};
+  chatHistory.push(userMsg); saveChat();
+  const area=document.getElementById('chat-area');
+  area.insertAdjacentHTML('beforeend',msgHTML(userMsg));
+  const tid='t'+Date.now();
+  area.insertAdjacentHTML('beforeend',`<div class="msg ai" id="${tid}"><div class="msg-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>`);
+  area.scrollTop=area.scrollHeight;
+  const p=window._profile||{};
+  const hour=new Date().getHours();
+  const tod=hour<12?'morning':hour<17?'afternoon':'evening';
+  const taskSummary=tasks.filter(t=>!t.completed).slice(0,10).map(t=>`- ${t.title}${t.dueDate?' (due '+new Date(t.dueDate).toLocaleDateString()+')':''}`).join('\n');
+  const routineSummary=Object.entries(routines).map(([p,ts])=>ts.length>0?`${p}: ${ts.map(t=>t.name+(t.completed?' ✓':'')).join(', ')}`:'').filter(Boolean).join('\n');
+  const systemCtx=`You are Clio, a warm and calm personal assistant — like a trusted, caring friend who helps ${p.name||'the user'} manage their life with clarity and calm. Never overwhelming, always supportive and encouraging.
+
+About ${p.name||'the user'}: ${p.about||''}
+Life areas: ${(p.lifeAreas||[]).join(', ')}
+People in their life: ${(p.people||[]).map(x=>`${x.name} (${x.role})`).join(', ')}
+Energy pattern: ${p.energy||'varies'}
+Time of day: ${tod}
+Open tasks:\n${taskSummary||'None'}
+Routines today:\n${routineSummary||'None set up'}
+
+Be warm, concise, and conversational. Ask clarifying questions when they seem overwhelmed. Help prioritize and break things into small manageable steps. Never create tasks without explicit approval. This is a mobile chat so keep responses focused and readable.`;
+  const messages=chatHistory.slice(-20).map(m=>({role:m.role==='ai'?'model':'user',parts:[{text:m.content}]}));
+  try {
+    const reply=await callGeminiChat(systemCtx, messages);
+    document.getElementById(tid)?.remove();
+    addAIMsg(reply);
+  } catch(e) {
+    document.getElementById(tid)?.remove();
+    addAIMsg("I'm having trouble connecting right now. Please check your internet and try again.");
+  }
+}
+
+function clearChat() {
+  chatHistory=[]; saveChat();
+  document.getElementById('chat-area').innerHTML='';
+  addAIMsg("How are you feeling today? I'm here whenever you're ready.");
+}
+
+// ── GEMINI API ──
+async function callGemini(prompt) {
+  const key = (window._profile?.geminiKey)||GEMINI_KEY;
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+  });
+  if (!r.ok) throw new Error('Gemini API error: '+r.status);
+  const d=await r.json();
+  return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}
+
+async function callGeminiChat(systemInstruction, messages) {
+  const key = (window._profile?.geminiKey)||GEMINI_KEY;
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      system_instruction:{parts:[{text:systemInstruction}]},
+      contents:messages
+    })
+  });
+  if (!r.ok) throw new Error('Gemini API error: '+r.status);
+  const d=await r.json();
+  return d.candidates?.[0]?.content?.parts?.[0]?.text||"I'm sorry, I couldn't respond right now.";
+}
+
+async function generateHomeGreeting() {
+  const p=window._profile||{};
+  const period=getCurrentPeriod();
+  const todayTasks=period!=='goodnight'?getTodayRoutineTasks(period):[];
+  const done=todayTasks.filter(t=>t.completed).length;
+  const total=todayTasks.length;
+  const topTasks=tasks.filter(t=>!t.completed).slice(0,3).map(t=>t.title).join(', ');
+  const prompt=`Write a brief, warm ${period==='goodnight'?'goodnight':period} greeting for ${p.name||'the user'}. 1-2 sentences max. Warm and human, like a caring friend. No emojis.
+${total>0?`They have completed ${done} of ${total} ${period} routine tasks today.`:''}
+${topTasks?`Their upcoming tasks include: ${topTasks}.`:'Their task list is clear.'}
+Sound calm and encouraging, not robotic.`;
+  try {
+    const text=await callGemini(prompt);
+    const el=document.getElementById('ai-greeting-text');
+    if(el) el.textContent=text.trim();
+  } catch(e) {
+    const el=document.getElementById('ai-greeting-text');
+    if(el) el.textContent=`Here's your overview for ${period==='goodnight'?'tonight':'today'}, ${p.name||'friend'}.`;
+  }
+}
+
+async function generateGoodNightMessage() {
+  const p=window._profile||{};
+  const completed=Object.values(routines).flat().filter(t=>t.completed).length;
+  const tasksDone=tasks.filter(t=>t.completed&&new Date(t.completedAt||0).toDateString()===new Date().toDateString()).length;
+  const prompt=`Write a warm, brief goodnight message for ${p.name||'the user'}. 1-2 sentences. Acknowledge their day and wish them rest. No emojis. Warm like a caring friend.${completed>0?` They completed ${completed} routine tasks today.`:''}`;
+  try {
+    const text=await callGemini(prompt);
+    document.getElementById('goodnight-text').textContent=text.trim();
+  } catch(e){}
+}
+
+// ── NAVIGATION ──
+function switchTab(tab) {
+  ['home','tasks','assistant'].forEach(t=>{
+    const el=document.getElementById(`tab-${t}`);
+    el.style.display=t===tab?(t==='assistant'?'flex':'block'):'none';
+    if(t==='assistant'&&tab==='assistant') el.style.flexDirection='column';
+    document.getElementById(`tab-btn-${t}`).classList.toggle('active',t===tab);
+  });
+  if(tab==='assistant') setTimeout(()=>{const a=document.getElementById('chat-area');a.scrollTop=a.scrollHeight;},100);
+  if(tab==='tasks') renderTasksArea();
+}
+
+// ── UTILS ──
+function formatTime(t) {
+  if(!t) return '';
+  const [h,m]=t.split(':').map(Number);
+  const ampm=h>=12?'PM':'AM'; const hr=h%12||12;
+  return `${hr}:${m.toString().padStart(2,'0')} ${ampm}`;
+}
+function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+function showToast(msg) {
+  document.querySelector('.toast')?.remove();
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2500);
+}
+</script>
+</body>
+</html>
